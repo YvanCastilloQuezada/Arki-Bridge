@@ -90,3 +90,55 @@ def test_verify_arki_token_format_guard(monkeypatch):
 def test_verify_arki_token_no_key(monkeypatch):
     monkeypatch.setattr(bridge_app, "IDENTITY_INTERNAL_KEY", "")
     assert bridge_app.verify_arki_token("a" * 43) is None
+
+
+# --- F4: scope enforcement ---
+
+def test_scope_git_read_ok():
+    """Token ARKI con git:read pasa en /v1/git/*."""
+    identity = {"subject": "u-1", "client_id": "bridge-local", "scopes": ["git:read"]}
+    # require_scope no lanza para scopes correctos
+    bridge_app.require_scope(identity, "git:read")
+
+
+def test_scope_files_read_ok():
+    identity = {"subject": "u-1", "client_id": "bridge-local", "scopes": ["files:read"]}
+    bridge_app.require_scope(identity, "files:read")
+
+
+def test_scope_wildcard_bypass():
+    """Token estático tiene ['*'] y bypassea todos los scopes."""
+    identity = {"subject": "bridge-static", "client_id": "bridge-local", "scopes": ["*"]}
+    bridge_app.require_scope(identity, "git:read")
+    bridge_app.require_scope(identity, "files:read")
+    bridge_app.require_scope(identity, "services:read")
+    bridge_app.require_scope(identity, "test:run")
+
+
+def test_scope_missing_git_read():
+    """Token sin git:read -> 403 al intentar /v1/git/*."""
+    identity = {"subject": "u-1", "client_id": "bridge-local", "scopes": ["files:read"]}
+    with pytest.raises(HTTPException) as exc:
+        bridge_app.require_scope(identity, "git:read")
+    assert exc.value.status_code == 403
+    assert "git:read" in exc.value.detail
+
+
+def test_scope_empty_scopes():
+    """Token sin scopes -> 403."""
+    identity = {"subject": "u-1", "client_id": "bridge-local", "scopes": []}
+    with pytest.raises(HTTPException) as exc:
+        bridge_app.require_scope(identity, "git:read")
+    assert exc.value.status_code == 403
+
+
+def test_scope_multiple_scopes():
+    """Token con varios scopes: git:read + files:read -> ambos permitidos."""
+    identity = {"subject": "u-1", "client_id": "bridge-local", "scopes": ["git:read", "files:read"]}
+    bridge_app.require_scope(identity, "git:read")
+    bridge_app.require_scope(identity, "files:read")
+    # pero no tiene services:read
+    with pytest.raises(HTTPException) as exc:
+        bridge_app.require_scope(identity, "services:read")
+    assert exc.value.status_code == 403
+
