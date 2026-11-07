@@ -11,3 +11,10 @@ venv/
 *.bak-f5
 *.bak-f6
 *.bak-f7
+
+# Backups pre-parche del Bridge
+*.bak-f3
+*.bak-f4
+*.bak-f5
+*.bak-f6
+*.bak-f7
