@@ -3,7 +3,7 @@ import json, os, re, secrets, subprocess, time, urllib.request, urllib.error
 from pathlib import Path
 from typing import Literal
 from fastapi import FastAPI, Header, HTTPException, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, FileResponse
 from pydantic import BaseModel, Field
 
 APP_NAME = "ARKI Bridge"
@@ -128,6 +128,11 @@ async def no_cache(request: Request, call_next):
 def health():
     return {"service":"arki-bridge","version":"0.2.0","auth":"required for operations",
             "identity_configured": bool(IDENTITY_INTERNAL_KEY)}
+
+@app.get("/openapi.yaml", include_in_schema=False)
+def openapi_yaml():
+    """Sirve el schema OpenAPI para GPT Actions. Público (sin auth)."""
+    return FileResponse("/opt/arki-bridge/openapi.yaml", media_type="application/yaml")
 
 @app.get("/v1/status")
 def status(authorization: str | None = Header(default=None)):

@@ -1,0 +1,286 @@
+openapi: 3.1.0
+info:
+  title: ARKI Bridge API
+  version: 0.2.0
+  description: |
+    API local restringida para ARKI-01. Expone operaciones de solo lectura
+    sobre los repositorios canónicos (sicl-web, sicl-core) y el estado de
+    servicios systemd.
+
+    Autenticación: Bearer token. Los tokens ARKI Identity deben tener el
+    scope correspondiente a cada endpoint (git:read, files:read,
+    services:read). El token estático del Bridge tiene scope ["*"] y
+    bypassea cualquier verificación de scope.
+
+servers:
+  - url: https://arki-001.tail190c32.ts.net:8443
+    description: Producción (Tailscale Funnel)
+
+security:
+  - BearerAuth: []
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: opaque
+      description: |
+        Token opaco de 43 caracteres emitido por ARKI Identity, o el token
+        estático del Bridge. El token debe enviarse como
+        `Authorization: Bearer <token>`.
+
+paths:
+  /health:
+    get:
+      summary: Estado del Bridge
+      operationId: getBridgeHealth
+      security: []
+      responses:
+        '200':
+          description: Bridge operativo
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  service:
+                    type: string
+                    example: arki-bridge
+                  version:
+                    type: string
+                    example: 0.2.0
+                  auth:
+                    type: string
+                    example: required for operations
+                  identity_configured:
+                    type: boolean
+                    example: true
+
+  /v1/status:
+    get:
+      summary: Estado de ambos repositorios
+      operationId: getRepoStatus
+      responses:
+        '200':
+          description: Estado de sicl-web y sicl-core
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties:
+                  type: object
+                  properties:
+                    repo:
+                      type: string
+                    exit_code:
+                      type: integer
+                    output:
+                      type: string
+        '401':
+          description: No autorizado
+        '403':
+          description: Falta scope git:read
+
+  /v1/git/{repo}/status:
+    get:
+      summary: git status de un repositorio
+      operationId: getGitStatus
+      parameters:
+        - name: repo
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [sicl-web, sicl-core]
+      responses:
+        '200':
+          description: Salida de git status --short --branch
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  repo:
+                    type: string
+                  exit_code:
+                    type: integer
+                  output:
+                    type: string
+        '401':
+          description: No autorizado
+        '403':
+          description: Falta scope git:read
+
+  /v1/git/{repo}/branch:
+    get:
+      summary: Rama actual de un repositorio
+      operationId: getGitBranch
+      parameters:
+        - name: repo
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [sicl-web, sicl-core]
+      responses:
+        '200':
+          description: Nombre de la rama actual
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  repo:
+                    type: string
+                  exit_code:
+                    type: integer
+                  output:
+                    type: string
+                    example: main
+        '401':
+          description: No autorizado
+        '403':
+          description: Falta scope git:read
+
+  /v1/git/{repo}/head:
+    get:
+      summary: Commit HEAD de un repositorio
+      operationId: getGitHead
+      parameters:
+        - name: repo
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [sicl-web, sicl-core]
+      responses:
+        '200':
+          description: SHA del commit HEAD
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  repo:
+                    type: string
+                  exit_code:
+                    type: integer
+                  output:
+                    type: string
+                    example: ecae7b44a3a33f0a25c3d7d736094c0fe8a66dc4
+        '401':
+          description: No autorizado
+        '403':
+          description: Falta scope git:read
+
+  /v1/git/{repo}/diff:
+    get:
+      summary: Diff de un repositorio
+      operationId: getGitDiff
+      parameters:
+        - name: repo
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [sicl-web, sicl-core]
+        - name: staged
+          in: query
+          required: false
+          schema:
+            type: boolean
+            default: false
+      responses:
+        '200':
+          description: Salida de git diff
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  repo:
+                    type: string
+                  exit_code:
+                    type: integer
+                  output:
+                    type: string
+        '401':
+          description: No autorizado
+        '403':
+          description: Falta scope git:read
+
+  /v1/files/{repo}/read:
+    post:
+      summary: Leer un archivo rastreado de un repositorio
+      operationId: readRepoFile
+      parameters:
+        - name: repo
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [sicl-web, sicl-core]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [path]
+              properties:
+                path:
+                  type: string
+                  description: Ruta relativa al repo
+                  example: README.md
+      responses:
+        '200':
+          description: Contenido del archivo
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  repo:
+                    type: string
+                  path:
+                    type: string
+                  bytes:
+                    type: integer
+                  content:
+                    type: string
+        '401':
+          description: No autorizado
+        '403':
+          description: Falta scope files:read, extensión no permitida, o path escape
+        '404':
+          description: Archivo no encontrado
+        '413':
+          description: Archivo demasiado grande
+
+  /v1/services:
+    get:
+      summary: Estado de servicios systemd
+      operationId: getServicesStatus
+      responses:
+        '200':
+          description: Estado de los servicios monitoreados
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  services:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        unit:
+                          type: string
+                        state:
+                          type: string
+                        example: active
+        '401':
+          description: No autorizado
+        '403':
+          description: Falta scope services:read
