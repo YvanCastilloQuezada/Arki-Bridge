@@ -56,6 +56,21 @@ def get_git_head(repo: str, token: str) -> dict:
     return bridge_app.run_fixed(repo, ["git", "rev-parse", "HEAD"])
 
 @mcp.tool(annotations=ToolAnnotations(readOnlyHint=True))
+def get_git_diff(repo: str, token: str, staged: bool = False) -> dict:
+    """Diff de un repositorio.
+    repo: 'sicl-web' o 'sicl-core'.
+    staged=True muestra cambios preparados.
+    Requiere token ARKI con scope git:read."""
+    identity = bridge_app.authorize(f"Bearer {token}")
+    bridge_app.require_scope(identity, "git:read")
+    args = ["git", "diff", "--no-ext-diff", "--no-color"]
+    if staged:
+        args.append("--cached")
+    args.append("--")
+    return bridge_app.run_fixed(repo, args, timeout=30)
+
+
+@mcp.tool(annotations=ToolAnnotations(readOnlyHint=True))
 def get_services_status(token: str) -> dict:
     """Estado de servicios systemd. Requiere token ARKI con scope services:read."""
     identity = bridge_app.authorize(f"Bearer {token}")
