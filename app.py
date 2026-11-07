@@ -86,6 +86,18 @@ def authorize(authorization: str | None) -> dict:
         return identity
     raise HTTPException(401, "Unauthorized")
 
+def require_scope(identity: dict, scope: str):
+    """Verifica que la identidad tenga el scope requerido.
+    - scopes ['*'] = bypass (token estático, compat total)
+    - scopes sin el requerido -> 403
+    - scopes con el requerido -> ok
+    Sin efecto en el resto del flujo; los endpoints lo llaman justo después de authorize()."""
+    scopes = identity.get("scopes") or []
+    if "*" in scopes:
+        return
+    if scope not in scopes:
+        raise HTTPException(403, f"Forbidden: missing scope '{scope}'")
+
 def repo_path(repo: str) -> Path:
     if repo not in ROOTS:
         raise HTTPException(404, "Unknown repository")
@@ -119,7 +131,8 @@ def health():
 
 @app.get("/v1/status")
 def status(authorization: str | None = Header(default=None)):
-    authorize(authorization)
+    identity = authorize(authorization)
+    require_scope(identity, "git:read")
     result = {}
     for name, root in ROOTS.items():
         if root.is_dir() and (root / ".git").exists():
@@ -131,22 +144,26 @@ def status(authorization: str | None = Header(default=None)):
 
 @app.get("/v1/git/{repo}/status")
 def git_status(repo: str, authorization: str | None = Header(default=None)):
-    authorize(authorization)
+    identity = authorize(authorization)
+    require_scope(identity, "git:read")
     return run_fixed(repo, ["git","status","--short","--branch"])
 
 @app.get("/v1/git/{repo}/branch")
 def git_branch(repo: str, authorization: str | None = Header(default=None)):
-    authorize(authorization)
+    identity = authorize(authorization)
+    require_scope(identity, "git:read")
     return run_fixed(repo, ["git","branch","--show-current"])
 
 @app.get("/v1/git/{repo}/head")
 def git_head(repo: str, authorization: str | None = Header(default=None)):
-    authorize(authorization)
+    identity = authorize(authorization)
+    require_scope(identity, "git:read")
     return run_fixed(repo, ["git","rev-parse","HEAD"])
 
 @app.get("/v1/git/{repo}/diff")
 def git_diff(repo: str, staged: bool = False, authorization: str | None = Header(default=None)):
-    authorize(authorization)
+    identity = authorize(authorization)
+    require_scope(identity, "git:read")
     args = ["git","diff","--no-ext-diff","--no-color"]
     if staged: args.append("--cached")
     args.append("--")
@@ -157,7 +174,8 @@ class ReadRequest(BaseModel):
 
 @app.post("/v1/files/{repo}/read")
 def read_file(repo: str, body: ReadRequest, authorization: str | None = Header(default=None)):
-    authorize(authorization)
+    identity = authorize(authorization)
+    require_scope(identity, "files:read")
     root = repo_path(repo)
     rel = Path(body.path)
     if rel.is_absolute() or any(part in ("..", "") for part in rel.parts):
@@ -185,7 +203,8 @@ class TestRequest(BaseModel):
 
 @app.post("/v1/test")
 def run_test(body: TestRequest, authorization: str | None = Header(default=None)):
-    authorize(authorization)
+    identity = authorize(authorization)
+    require_scope(identity, "test:run")
     if body.suite == "core-pytest":
         repo = "sicl-core"
         args = ["python3","-m","pytest","-q"]
@@ -198,7 +217,8 @@ def run_test(body: TestRequest, authorization: str | None = Header(default=None)
 
 @app.get("/v1/services")
 def services(authorization: str | None = Header(default=None)):
-    authorize(authorization)
+    identity = authorize(authorization)
+    require_scope(identity, "services:read")
     names = ["sicl-core.service","sicl-web.service","arki-arbol-vivo.service","arki-maqueta-viva.service"]
     out = []
     for name in names:
