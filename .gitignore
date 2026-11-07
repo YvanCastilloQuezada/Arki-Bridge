@@ -18,3 +18,4 @@ venv/
 *.bak-f5
 *.bak-f6
 *.bak-f7
+app.py.bak-f6*
