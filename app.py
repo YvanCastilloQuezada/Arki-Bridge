@@ -234,12 +234,11 @@ def services(authorization: str | None = Header(default=None)):
 
 # F6.5: montar MCP en /mcp si fastmcp está instalado.
 # Si no está, el Bridge sigue funcionando sin MCP.
-try:
-    from mcp_server import mcp_app as _mcp_app
-    app.mount("/mcp", _mcp_app)
-    MCP_ENABLED = True
-except ImportError:
-    MCP_ENABLED = False
+# F6.5: MCP corre en proceso separado (arki-bridge-mcp.service, :18770).
+# No se monta en esta app FastAPI (StreamableHTTPASGIApp no se integra
+# como sub-app sin conflictos con redirect_slashes/lifespan).
+# Ver /opt/arki-bridge/mcp_server_entry.py y arki-bridge-mcp.service.
+MCP_ENABLED = False
 
 @app.exception_handler(Exception)
 async def unhandled(request: Request, exc: Exception):
