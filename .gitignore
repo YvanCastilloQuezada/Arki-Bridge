@@ -4,3 +4,10 @@ __pycache__/
 venv/
 .pytest_cache/
 *.log
+
+# Backups pre-parche (F3, F4, ...)
+*.bak-f3
+*.bak-f4
+*.bak-f5
+*.bak-f6
+*.bak-f7
