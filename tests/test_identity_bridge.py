@@ -38,16 +38,21 @@ def test_arki_token_revoked(monkeypatch):
 
 # --- 4. Token formato inválido no llega a verify_arki_token ---
 
-def test_arki_token_wrong_format_no_call(monkeypatch):
+def test_arki_token_wrong_format_no_http(monkeypatch):
+    """Formato inválido en verify_arki_token: no hay request HTTP.
+    El guard está dentro de verify_arki_token (no en authorize)."""
+    import urllib.request
     called = {"n": 0}
-    def fake_verify(token):
+    original = urllib.request.urlopen
+    def fake(*a, **k):
         called["n"] += 1
-        return None
-    monkeypatch.setattr(bridge_app, "verify_arki_token", fake_verify)
-    with pytest.raises(HTTPException) as exc:
-        bridge_app.authorize("Bearer short-token")
-    assert exc.value.status_code == 401
-    assert called["n"] == 0  # formato inválido, no consulta
+        return original(*a, **k)
+    monkeypatch.setattr(urllib.request, "urlopen", fake)
+    # verify_arki_token con formatos inválidos retorna None sin abrir conexión
+    assert bridge_app.verify_arki_token("short") is None
+    assert bridge_app.verify_arki_token("a" * 42) is None  # 42 chars
+    assert bridge_app.verify_arki_token("a" * 44) is None  # 44 chars
+    assert called["n"] == 0
 
 
 # --- 5. Sin IDENTITY_INTERNAL_KEY configurado (Bridge vive solo de estático) ---
