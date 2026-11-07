@@ -232,6 +232,15 @@ def services(authorization: str | None = Header(default=None)):
     audit("services",None,"ok")
     return {"services":out}
 
+# F6.5: montar MCP en /mcp si fastmcp está instalado.
+# Si no está, el Bridge sigue funcionando sin MCP.
+try:
+    from mcp_server import mcp_app as _mcp_app
+    app.mount("/mcp", _mcp_app)
+    MCP_ENABLED = True
+except ImportError:
+    MCP_ENABLED = False
+
 @app.exception_handler(Exception)
 async def unhandled(request: Request, exc: Exception):
     audit("error",None,"error",type(exc).__name__)
