@@ -56,21 +56,6 @@ def get_git_head(repo: str, token: str) -> dict:
     return bridge_app.run_fixed(repo, ["git", "rev-parse", "HEAD"])
 
 @mcp.tool(annotations=ToolAnnotations(readOnlyHint=True))
-def get_git_diff(repo: str, token: str, staged: bool = False) -> dict:
-    """Diff de un repositorio.
-    repo: 'sicl-web' o 'sicl-core'.
-    staged=True muestra cambios preparados.
-    Requiere token ARKI con scope git:read."""
-    identity = bridge_app.authorize(f"Bearer {token}")
-    bridge_app.require_scope(identity, "git:read")
-    args = ["git", "diff", "--no-ext-diff", "--no-color"]
-    if staged:
-        args.append("--cached")
-    args.append("--")
-    return bridge_app.run_fixed(repo, args, timeout=30)
-
-
-@mcp.tool(annotations=ToolAnnotations(readOnlyHint=True))
 def get_services_status(token: str) -> dict:
     """Estado de servicios systemd. Requiere token ARKI con scope services:read."""
     identity = bridge_app.authorize(f"Bearer {token}")
@@ -84,6 +69,19 @@ def get_services_status(token: str) -> dict:
     return {"services": out}
 
 # App raíz — MCP es la app, no sub-app
+@mcp.tool(annotations=ToolAnnotations(readOnlyHint=True))
+def get_git_diff(repo: str, token: str, staged: bool = False) -> dict:
+    """Diff de un repositorio.
+    repo: 'sicl-web' o 'sicl-core'.
+    staged=True muestra cambios preparados.
+    Requiere token ARKI con scope git:read."""
+    identity = bridge_app.authorize(f"Bearer {token}")
+    bridge_app.require_scope(identity, "git:read")
+    args = ["git", "diff", "--no-ext-diff", "--no-color"]
+    if staged:
+        args.append("--cached")
+    args.append("--")
+    return bridge_app.run_fixed(repo, args, timeout=30)
 
 # ARKI_MCP_43_TOOLS_BEGIN
 # ARKI BRIDGE — 43 herramientas MCP adicionales, solo lectura.
@@ -97,7 +95,7 @@ def _arki_read_tool(repo: str, token: str, git_args: list[str]) -> dict:
 
     return bridge_app.run_fixed(
         repo,
-        git_args,
+        ["git"] + git_args,
         timeout=30,
     )
 
@@ -169,7 +167,6 @@ for _name, _args in _ARKI_43_TOOLS:
     _register_arki_read_tool(_name, _args)
 
 # ARKI_MCP_43_TOOLS_END
-
 
 app = mcp.http_app(path="/")
 
