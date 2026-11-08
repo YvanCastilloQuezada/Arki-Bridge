@@ -26,3 +26,10 @@ F65-MCP-E2E.sh
 arki-bridge-runtime/
 mcp_server_entry.py.backup-*
 *.backup-*
+
+# Basura de sesiones F6.5
+200
+F65-MCP-E2E.sh
+arki-bridge-runtime/
+mcp_server_entry.py.backup-*
+*.backup-*
